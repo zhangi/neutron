@@ -14,6 +14,7 @@
 
 import collections
 import functools
+import hashlib
 import re
 import uuid
 
@@ -263,7 +264,8 @@ class MetadataAgent(object):
         # NOTE(lucasagomes): db_add() will not overwrite the UUID if
         # it's already set.
         table = ('Chassis_Private' if self.has_chassis_private else 'Chassis')
-        chassis_id = uuid.UUID(self._get_own_chassis_name())
+        chassis_md5sum = hashlib.md5(self.chassis.encode("utf-8"))
+        chassis_id = uuid.UUID(chassis_md5sum.hexdigest())
         # Generate unique, but consistent metadata id for chassis name
         agent_id = uuid.uuid5(chassis_id, 'metadata_agent')
         ext_ids = {ovn_const.OVN_AGENT_METADATA_ID_KEY: str(agent_id)}
