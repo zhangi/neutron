@@ -261,6 +261,7 @@ class MetadataAgent(object):
             max=config.get_ovn_ovsdb_retry_max_interval()),
         reraise=True)
     def register_metadata_agent(self):
+        LOG.info("register metadata agent: %s", self.chassis)
         # NOTE(lucasagomes): db_add() will not overwrite the UUID if
         # it's already set.
         table = ('Chassis_Private' if self.has_chassis_private else 'Chassis')
