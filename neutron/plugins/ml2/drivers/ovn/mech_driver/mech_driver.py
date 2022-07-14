@@ -53,6 +53,7 @@ from neutron.db import ovn_hash_ring_db
 from neutron.db import ovn_revision_numbers_db
 from neutron.db import provisioning_blocks
 from neutron.extensions import securitygroup as ext_sg
+from neutron.objects import network as obj_network
 from neutron.plugins.ml2 import db as ml2_db
 from neutron.plugins.ml2.drivers.ovn.agent import neutron_agent as n_agent
 from neutron.plugins.ml2.drivers.ovn.mech_driver.ovsdb import impl_idl_ovn
@@ -1280,6 +1281,73 @@ class OVNMechanismDriver(api.MechanismDriver):
                               'state': 'available',
                               'tenant_id': context.project_id}
         return azs
+
+    @staticmethod
+    def _map_val(row, col, key):
+        # If the row doesnt exist, RowNotFound is raised by the _map_val
+        # and is expected to be caught by the caller.
+        try:
+            return getattr(row, col)[key]
+        except KeyError as e:
+            raise idlutils.RowNotFound(table=row._table.name,
+                                       col=col, match=key) from e
+
+    def set_dns_in_all_ls(self, row):
+        try:
+            ls_name = row.external_ids.get('ls_name')
+            ls = self.nb_ovn.lookup('Logical_Switch', ls_name)
+        except idlutils.RowNotFound:
+            LOG.debug("Logical switch not found: %s", ls_name)
+            return
+        context = n_context.get_admin_context()
+        net_id = ls.name.replace(ovn_const.OVN_NAME_PREFIX, '')
+        network = obj_network.Network.get_object(context, id=net_id)
+        networks = obj_network.Network.get_objects(
+            context, project_id=network.project_id)
+
+        ls_uuids = []
+        skip_ls_name = ls_name
+        for network in networks:
+            ls_name = ovn_utils.ovn_name(network.id)
+            try:
+                ls = self.nb_ovn.lookup('Logical_Switch', ls_name)
+            except idlutils.RowNotFound:
+                LOG.debug("Logical switch not found: %s", ls_name)
+                continue
+            if ls_name != skip_ls_name:
+                ls_uuids.append(ls.uuid)
+        with self.ovn_api.transaction(check_error=True) as txn:
+            for ls_id in ls_uuids:
+                txn.add(self.ovn_api.ls_add_dns_record(ls_id, row.id))
+
+    def del_dns_in_all_ls(self, row):
+        try:
+            ls_name = row.external_ids.get('ls_name')
+            ls = self.nb_ovn.lookup('Logical_Switch', ls_name)
+        except idlutils.RowNotFound:
+            LOG.debug("Logical switch not found: %s", ls_name)
+            return
+        context = n_context.get_admin_context()
+        net_id = ls.name.replace(ovn_const.OVN_NAME_PREFIX, '')
+        network = obj_network.Network.get_object(context, id=net_id)
+        networks = obj_network.Network.get_objects(
+            context, project_id=network.project_id)
+
+        ls_uuids = []
+        skip_ls_name = ls_name
+        for network in networks:
+            ls_name = ovn_utils.ovn_name(network.id)
+            try:
+                ls = self.nb_ovn.lookup('Logical_Switch', ls_name)
+            except idlutils.RowNotFound:
+                LOG.debug("Logical switch not found: %s", ls_name)
+                continue
+            if ls_name != skip_ls_name:
+                ls_uuids.append(ls.uuid)
+        with self.ovn_api.transaction(check_error=True) as txn:
+            for ls_id in ls_uuids:
+                txn.add(self.ovn_api.ls_remove_dns_record(
+                    ls_id, row.id, if_exists=True))
 
 
 def get_agents(self, context, filters=None, fields=None, _driver=None):
