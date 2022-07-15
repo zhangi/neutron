@@ -511,6 +511,48 @@ class LogicalSwitchPortUpdateDownEvent(row_event.RowEvent):
         self.driver.set_port_status_down(row.name)
 
 
+class DNSCreateEvent(row_event.RowEvent):
+    """Row event - DNS being deleted
+
+    This happens when a port is set a dns name on a network for the first time
+    """
+
+    def __init__(self, driver):
+        self.driver = driver
+        table = 'DNS'
+        events = (self.ROW_CREATE,)
+        super().__init__(events, table, None)
+        self.event_name = 'DNSCreateEvent'
+
+    def run(self, event, row, old):
+        LOG.debug('DNSCreateEvent logged, '
+                  '%(event)s, %(row)s',
+                  {'event': event,
+                   'row': row})
+        self.driver.set_dns_in_all_ls(row)
+
+
+class DNSDeleteEvent(row_event.RowEvent):
+    """Row event - DNS being deleted
+
+    This happens when a network is deleted
+    """
+
+    def __init__(self, driver):
+        self.driver = driver
+        table = 'DNS'
+        events = (self.ROW_DELETE,)
+        super().__init__(events, table, None)
+        self.event_name = 'DNSDeleteEvent'
+
+    def run(self, event, row, old):
+        LOG.debug('DNSDeleteEvent logged, '
+                  '%(event)s, %(row)s',
+                  {'event': event,
+                   'row': row})
+        self.driver.del_dns_in_all_ls(row)
+
+
 class PortBindingUpdateVirtualPortsEvent(row_event.RowEvent):
     """Row update event - Port_Binding for virtual ports
 
@@ -761,12 +803,16 @@ class OvnNbIdl(OvnIdlDistributedLock):
         self._lsp_create_up_event = LogicalSwitchPortCreateUpEvent(driver)
         self._lsp_create_down_event = LogicalSwitchPortCreateDownEvent(driver)
         self._fip_create_delete_event = FIPAddDeleteEvent(driver)
+        self._dns_create_event = DNSCreateEvent(driver)
+        self._dns_delete_event = DNSDeleteEvent(driver)
 
         self.notify_handler.watch_events([self._lsp_create_up_event,
                                           self._lsp_create_down_event,
                                           self._lsp_update_up_event,
                                           self._lsp_update_down_event,
-                                          self._fip_create_delete_event])
+                                          self._fip_create_delete_event,
+                                          self._dns_create_event,
+                                          self._dns_delete_event])
 
     @classmethod
     def from_server(cls, connection_string, helper, driver):

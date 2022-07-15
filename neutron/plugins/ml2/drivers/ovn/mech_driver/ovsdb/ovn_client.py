@@ -2384,7 +2384,7 @@ class OVNClient(object):
         if ls_dns_record is None:
             dns_add_txn = txn.add(self._nb_idl.dns_add(
                 external_ids={'ls_name': ls.name}, records=records_to_add))
-            txn.add(self._nb_idl.ls_set_dns_records(ls.uuid, dns_add_txn))
+            txn.add(self._nb_idl.ls_add_dns_record(ls.uuid, dns_add_txn))
             return
 
         if original_port:

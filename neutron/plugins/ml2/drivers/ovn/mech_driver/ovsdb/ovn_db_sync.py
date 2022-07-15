@@ -1149,7 +1149,7 @@ class OvnNbSynchronizer(OvnDbSynchronizer):
             if not ls_dns_record:
                 dns_add_txn = txn.add(self.ovn_api.dns_add(
                     external_ids={'ls_name': ls.name}, records=dns_records))
-                txn.add(self.ovn_api.ls_set_dns_records(ls.uuid, dns_add_txn))
+                txn.add(self.ovn_api.ls_add_dns_record(ls.uuid, dns_add_txn))
             else:
                 txn.add(self.ovn_api.dns_set_records(ls_dns_record.uuid,
                                                      **dns_records))
